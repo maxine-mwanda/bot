@@ -8,16 +8,18 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type Message struct {
 	CallbackQuery struct {
-		Data string `json:"data"`
-		Message struct{
-			Chat struct{
+		Data    string `json:"data"`
+		Message struct {
+			Chat struct {
 				Id int `json:"id"`
 			} `json:"chat"`
 		} `json:"message"`
@@ -26,7 +28,7 @@ type Message struct {
 	Message struct {
 		Text string `json:"text"`
 		Chat struct {
-			Id int `json:"id"`
+			Id        int    `json:"id"`
 			FirstName string `json:"first_name"`
 		} `json:"chat"`
 	} `json:"message"`
@@ -57,8 +59,8 @@ func listen(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("message", msg)
 	response := getresponse(msg)
 	fmt.Println("response", response)
-	keyboard:= CreateKeyboard()
-	err= sendmessage(chatId, response, keyboard)
+	keyboard := CreateKeyboard()
+	err = sendmessage(chatId, response, keyboard)
 	if err != nil {
 		fmt.Println("error", err)
 	}
@@ -69,7 +71,6 @@ func listen(w http.ResponseWriter, r *http.Request) {
 func main() {
 	var port = ":3000"
 	_ = godotenv.Load()
-
 
 	headers := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "content-length", "accept-encoding", "Authorization"})
 	origins := handlers.AllowedOrigins([]string{"*"})
@@ -85,30 +86,63 @@ func main() {
 		os.Exit(3)
 	}
 
-
 }
 
-
-func getresponse(message string) string{
+func getresponse(message string) string {
 	message = strings.ToLower(message)
 
 	switch message {
-	case "truth" :
-		return "Tell me your secret"
-	case "dare" :
-		return "Scream at someone"
+	case "truth":
+		return getTruth()
+	case "dare":
+		return getDare()
 	default:
 		return "Please choose truth or dare"
 
 	}
 }
 
-func sendmessage (chatid int, message, keyboard string) (err error) {
+func getTruth() string {
+
+	currentTimeNanoSeconds := time.Now().UnixNano()
+	rand.Seed(currentTimeNanoSeconds)
+
+	var truths = [5]string{
+		"When was the last time you lied?",
+		"When was the last time you cried?",
+		"What's your biggest fear?",
+		"What's your biggest fantasy?",
+		"Do you have any fetishes?",
+	}
+	position := rand.Intn(5)
+	return truths[position]
+	//TODO:
+	// Define an array of strings, each string is a truth.
+	// Return one of them (at random)
+}
+
+func getDare() string {
+
+	currentTimeNanoSeconds := time.Now().UnixNano()
+	rand.Seed(currentTimeNanoSeconds)
+
+	var dares = [5]string{
+		"Kiss the person to your left",
+		"Attempt to do a magic trick",
+		"Do four cartwheels in row",
+		"Let someone shave part of your body",
+		"Eat five tablespoons of a condiment",
+	}
+	position := rand.Intn(5)
+	return dares[position]
+}
+
+func sendmessage(chatid int, message, keyboard string) (err error) {
 	token := os.Getenv("TOKEN")
-	url := fmt.Sprintf( "https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s&reply_markup=%s", token, chatid, message, keyboard)
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s&reply_markup=%s", token, chatid, message, keyboard)
 	client := &http.Client{}
 
-	req,err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -117,25 +151,25 @@ func sendmessage (chatid int, message, keyboard string) (err error) {
 		return err
 	}
 
-	if res.StatusCode!=200{
+	if res.StatusCode != 200 {
 		return errors.New(res.Status)
 	}
 	return nil
 }
 
-func CreateKeyboard () string {
-	keyboard:= map[string]interface{}{
-		"inline_keyboard" : [][]map[string]string{
+func CreateKeyboard() string {
+	keyboard := map[string]interface{}{
+		"inline_keyboard": [][]map[string]string{
 			{
-			{
-				"text": "Truth",
-				"callback_data": "truth",
-			},
+				{
+					"text":          "Truth",
+					"callback_data": "truth",
+				},
 			},
 
 			{
 				{
-					"text": "Dare",
+					"text":          "Dare",
 					"callback_data": "dare",
 				},
 			},
