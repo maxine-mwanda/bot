@@ -7,11 +7,14 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
+	"telegrambot/resources"
 	"time"
 )
 
@@ -41,10 +44,11 @@ func listen(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
+		log.Println("Unable t decode payload because ", err)
 		w.Write([]byte("error"))
 		return
-
 	}
+	log.Println("Received payload")
 
 	if data.CallbackQuery.Data == "" {
 		// its a message
@@ -56,13 +60,13 @@ func listen(w http.ResponseWriter, r *http.Request) {
 		msg = data.CallbackQuery.Data
 	}
 
-	fmt.Println("message", msg)
-	response := getresponse(msg)
-	fmt.Println("response", response)
-	keyboard := CreateKeyboard()
+	log.Println("message", msg, "chat Id ", chatId)
+	response, keyboard := getresponse(msg)
+	log.Println("response", response)
+	log.Println("keyboard", keyboard)
 	err = sendmessage(chatId, response, keyboard)
 	if err != nil {
-		fmt.Println("error", err)
+		log.Println("error", err)
 	}
 
 	w.Write([]byte("ok"))
@@ -70,7 +74,11 @@ func listen(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	var port = ":3000"
-	_ = godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("Unable to read .env file. exiting")
+	}
+	initLogger()
+	log.Println("Running")
 
 	headers := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "content-length", "accept-encoding", "Authorization"})
 	origins := handlers.AllowedOrigins([]string{"*"})
@@ -88,16 +96,25 @@ func main() {
 
 }
 
-func getresponse(message string) string {
+func getresponse(message string) (string, string) {
 	message = strings.ToLower(message)
+	log.Println("The Message == ", message)
 
 	switch message {
 	case "truth":
-		return getTruth()
+		return getTruth(), resources.AcceptDeclineKeyboard()
 	case "dare":
-		return getDare()
+		return getDare(), resources.AcceptDeclineKeyboard()
+	case "start", "/start":
+		return "Welcome to Truth or Dare game. How many players", resources.PlayerCountKeyboard()
+	case "players3":
+		// TODO: When someone chooses Three, create a game session
+		return "Kindly tell your friends to text me 'Join 567'", ""
+	case "join 567":
+		// TODO: When a player sends join 567, add the record to player_scores table
+		return "congratulations Maxine for joining. Please choose truth or dare", ""
 	default:
-		return "Please choose truth or dare"
+		return "Please choose truth or dare", resources.TruthOrDareKeyboard()
 
 	}
 }
@@ -139,10 +156,12 @@ func getDare() string {
 
 func sendmessage(chatid int, message, keyboard string) (err error) {
 	token := os.Getenv("TOKEN")
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s&reply_markup=%s", token, chatid, message, keyboard)
+	msg := url.QueryEscape(message)
+	link := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s&reply_markup=%s", token, chatid, msg, keyboard)
+	log.Println("Sending message :: ", link)
 	client := &http.Client{}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", link, nil)
 	if err != nil {
 		return err
 	}
@@ -154,28 +173,29 @@ func sendmessage(chatid int, message, keyboard string) (err error) {
 	if res.StatusCode != 200 {
 		return errors.New(res.Status)
 	}
+	log.Println("Message sent back to telegram")
 	return nil
 }
 
-func CreateKeyboard() string {
-	keyboard := map[string]interface{}{
-		"inline_keyboard": [][]map[string]string{
-			{
-				{
-					"text":          "Truth",
-					"callback_data": "truth",
-				},
-			},
 
-			{
-				{
-					"text":          "Dare",
-					"callback_data": "dare",
-				},
-			},
-		},
+func initLogger() {
+	logFolder := os.Getenv("LOG_FOLDER")
+	writer, err := rotatelogs.New(
+		fmt.Sprintf("%s%s.log", logFolder+"app-", "%Y-%m-%d.%H%M"),
+		rotatelogs.WithLinkName(logFolder+"link.log"),
+		rotatelogs.WithRotationTime(time.Hour*24),
+		rotatelogs.WithMaxAge(-1),
+		rotatelogs.WithRotationCount(10000),
+	)
+	if err != nil {
+		fmt.Println("Failed to initialize log file ", err.Error())
+		log.SetOutput(os.Stderr)
+		return
 	}
-
-	jsonkeyboard, _ := json.Marshal(keyboard)
-	return string(jsonkeyboard)
+	if os.Getenv("ENV") == "dev" {
+		log.SetOutput(os.Stderr)
+		return
+	}
+	log.SetOutput(writer)
+	return
 }

@@ -1,0 +1,11 @@
+[Unit]
+Description=service for telegram bot
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/telegram/
+ExecStart=/bin/bash /root/telegram/start.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -1,1 +1,3 @@
 TOKEN=
+LOG_FOLDER=logs/
+ENV=dev
