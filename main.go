@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"telegrambot/resources"
+	resources2 "telegrambot/resources/db"
 	"time"
 )
 
@@ -30,9 +31,12 @@ type Message struct {
 
 	Message struct {
 		Text string `json:"text"`
+		From struct{
+			ID int `json:"id"`
+			FirstName string `json:"first_name"`
+		} `json:"from"`
 		Chat struct {
 			Id        int    `json:"id"`
-			FirstName string `json:"first_name"`
 		} `json:"chat"`
 	} `json:"message"`
 }
@@ -100,23 +104,29 @@ func getresponse(message string) (string, string) {
 	message = strings.ToLower(message)
 	log.Println("The Message == ", message)
 
-	switch message {
-	case "truth":
+	if message == "truth" {
 		return getTruth(), resources.AcceptDeclineKeyboard()
-	case "dare":
+	}
+	if message == "dare" {
 		return getDare(), resources.AcceptDeclineKeyboard()
-	case "start", "/start":
-		return "Welcome to Truth or Dare game. How many players", resources.PlayerCountKeyboard()
-	case "players3":
+	}
+	if message == "start" || message == "/start" {
 		// TODO: When someone chooses Three, create a game session
+		gameId, err := resources2.CreateGameSession()
+		if err != nil {
+			return "An error occured. Please try again later.", ""
+		}
+		return "Welcome to Truth or Dare game. How many players are you?", resources.PlayerCountKeyboard(gameId)
+	}
+	if strings.Contains(message, "players") {
 		return "Kindly tell your friends to text me 'Join 567'", ""
-	case "join 567":
+	}
+	if message == "join 567" {
 		// TODO: When a player sends join 567, add the record to player_scores table
 		return "congratulations Maxine for joining. Please choose truth or dare", ""
-	default:
-		return "Please choose truth or dare", resources.TruthOrDareKeyboard()
-
 	}
+	return "Please choose truth or dare", resources.TruthOrDareKeyboard()
+	
 }
 
 func getTruth() string {
@@ -176,7 +186,6 @@ func sendmessage(chatid int, message, keyboard string) (err error) {
 	log.Println("Message sent back to telegram")
 	return nil
 }
-
 
 func initLogger() {
 	logFolder := os.Getenv("LOG_FOLDER")

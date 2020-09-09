@@ -1,6 +1,9 @@
 package resources
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 func AcceptDeclineKeyboard() string {
 	keyboard_first := map[string]interface{}{
@@ -51,34 +54,34 @@ func TruthOrDareKeyboard() string {
 
 
 
-func PlayerCountKeyboard() string {
+func PlayerCountKeyboard(gameId int64) string {
 
 	keyboard := map[string]interface{}{
 		"inline_keyboard": [][]map[string]string{
 			{
 				{
 					"text":          "Two",
-					"callback_data": "players2",
+					"callback_data": fmt.Sprintf("players2-%d", gameId),
 				},
 			},
 
 			{
 				{
 					"text":          "Three",
-					"callback_data": "players3",
+					"callback_data": fmt.Sprintf("players3-%d", gameId),
 				},
 			},
 			{
 				{
 					"text":          "Four",
-					"callback_data": "players3",
+					"callback_data": fmt.Sprintf("players3-%d", gameId),
 				},
 			},
 
 			{
 				{
 					"text":          "Five",
-					"callback_data": "players5",
+					"callback_data": fmt.Sprintf("players5-%d",gameId),
 				},
 			},
 		},

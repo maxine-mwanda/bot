@@ -1,6 +1,3 @@
-package
-main
-
 CREATE DATABASE Truth_or_dare;
 USE Truth_or_dare;
 CREATE TABLE players
