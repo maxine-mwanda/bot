@@ -1,9 +1,11 @@
 CREATE DATABASE Truth_or_dare;
 USE Truth_or_dare;
+-- modify the telegram_id field to be unique. Run this query kwa the db
+CREATE UNIQUE INDEX players ON (teleram_id);
 CREATE TABLE players
 (
     user_id     INT(10) PRIMARY KEY AUTO_INCREMENT,
-    telegram_id INT(15)     NOT NULL,
+    telegram_id INT(15)   NOT NULL,
     first_name  VARCHAR(30) NOT NULL,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP

@@ -31,12 +31,12 @@ type Message struct {
 
 	Message struct {
 		Text string `json:"text"`
-		From struct{
-			ID int `json:"id"`
+		From struct {
+			ID        int    `json:"id"`
 			FirstName string `json:"first_name"`
 		} `json:"from"`
 		Chat struct {
-			Id        int    `json:"id"`
+			Id int `json:"id"`
 		} `json:"chat"`
 	} `json:"message"`
 }
@@ -45,6 +45,8 @@ func listen(w http.ResponseWriter, r *http.Request) {
 	var data Message
 	var chatId int
 	var msg string
+	var firstName string
+	var telegramId int
 
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
@@ -54,18 +56,23 @@ func listen(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Received payload")
 
+
 	if data.CallbackQuery.Data == "" {
 		// its a message
 		chatId = data.Message.Chat.Id
 		msg = data.Message.Text
+		telegramId = data.Message.From.ID
+		firstName = data.Message.From.FirstName
 	} else {
-		// its a callback
+		// its a callback (button, keyboard)
 		chatId = data.CallbackQuery.Message.Chat.Id
 		msg = data.CallbackQuery.Data
+		//telegramId = data.Message.From.ID
+		//firstName = data.Message.From.FirstName
 	}
 
 	log.Println("message", msg, "chat Id ", chatId)
-	response, keyboard := getresponse(msg)
+	response, keyboard := getresponse(msg, firstName, telegramId)
 	log.Println("response", response)
 	log.Println("keyboard", keyboard)
 	err = sendmessage(chatId, response, keyboard)
@@ -100,7 +107,7 @@ func main() {
 
 }
 
-func getresponse(message string) (string, string) {
+func getresponse(message, firstName string, telegramId int) (string, string) {
 	message = strings.ToLower(message)
 	log.Println("The Message == ", message)
 
@@ -119,14 +126,21 @@ func getresponse(message string) (string, string) {
 		return "Welcome to Truth or Dare game. How many players are you?", resources.PlayerCountKeyboard(gameId)
 	}
 	if strings.Contains(message, "players") {
+		// TODO: create a function that prints the game id and number of players.
+		// e.g if the message is players3-6 it prints 3 players, game 6
+		if strings.Contains(message, "players 3") {
+			resources.PlayerCountKeyboard(6)
+		}
 		return "Kindly tell your friends to text me 'Join 567'", ""
 	}
 	if message == "join 567" {
 		// TODO: When a player sends join 567, add the record to player_scores table
-		return "congratulations Maxine for joining. Please choose truth or dare", ""
+		resources2.Create_player(telegramId, firstName)
+
+		return "congratulations Maxine for joining. Please choose truth or dare", resources.TruthOrDareKeyboard()
 	}
 	return "Please choose truth or dare", resources.TruthOrDareKeyboard()
-	
+
 }
 
 func getTruth() string {
