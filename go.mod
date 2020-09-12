@@ -3,6 +3,8 @@ module telegrambot
 go 1.14
 
 require (
+	github.com/go-redis/redis v6.15.9+incompatible
+	github.com/go-redis/redis/v7 v7.4.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gorilla/handlers v1.5.0
 	github.com/gorilla/mux v1.8.0

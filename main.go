@@ -156,11 +156,10 @@ func getTruth() string {
 		"Do you have any fetishes?",
 	}
 	position := rand.Intn(5)
+
 	return truths[position]
-	//TODO:
-	// Define an array of strings, each string is a truth.
-	// Return one of them (at random)
-}
+
+	}
 
 func getDare() string {
 

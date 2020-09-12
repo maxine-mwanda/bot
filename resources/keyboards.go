@@ -3,6 +3,7 @@ package resources
 import (
 	"encoding/json"
 	"fmt"
+	resources "telegrambot/resources/db"
 )
 
 func AcceptDeclineKeyboard() string {
@@ -11,14 +12,14 @@ func AcceptDeclineKeyboard() string {
 			{
 				{
 					"text":          "Accept",
-					"callback_data": "Please choose truth or dare",
+					"callback_data": "accept_g567_q1",
 				},
 			},
 
 			{
 				{
 					"text":          "Decline",
-					"callback_data": "You have lost ten points",
+					"callback_data": fmt.Sprintf("You have lost %d points", resources.PlayerScores),
 				},
 			},
 		},

@@ -1,7 +1,7 @@
 CREATE DATABASE Truth_or_dare;
 USE Truth_or_dare;
 -- modify the telegram_id field to be unique. Run this query kwa the db
-CREATE UNIQUE INDEX players ON (teleram_id);
+create unique index unique_telegram_id on  players (telegram_id);
 CREATE TABLE players
 (
     user_id     INT(10) PRIMARY KEY AUTO_INCREMENT,
