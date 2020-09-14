@@ -16,6 +16,7 @@ import (
 	"strings"
 	"telegrambot/resources"
 	resources2 "telegrambot/resources/db"
+	"telegrambot/resources/db/utils"
 	"time"
 )
 
@@ -133,9 +134,27 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		}
 		return "Kindly tell your friends to text me 'Join 567'", ""
 	}
-	if message == "join 567" {
+	if message == "join 1" {
 		// TODO: When a player sends join 567, add the record to player_scores table
-		resources2.Create_player(telegramId, firstName)
+		userId, err := resources2.Create_player(telegramId, firstName)
+		if err != nil {
+			return "an error occured", ""
+		}
+		gameId := strings.Replace(message, "join ", "", 1)
+		gameId = strings.Trim(gameId, " ")
+
+		// TODO : add the record to player_scores table
+		key := fmt.Sprintf("user_%d", userId)
+		truthsAndDares, err := utils.TruthsAndDaresFromDB()
+		if err != nil {
+			return "an error occured", ""
+		}
+		redisClient := utils.ConnectToRedis()
+		err = utils.SaveToRedis(key, truthsAndDares, redisClient)
+		if err != nil {
+			return "an error occured", ""
+		}
+
 
 		return "congratulations Maxine for joining. Please choose truth or dare", resources.TruthOrDareKeyboard()
 	}

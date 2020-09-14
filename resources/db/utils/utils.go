@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"telegrambot/entities"
 	"time"
 
 )
@@ -22,7 +23,34 @@ func  Connecttodb() (connection *sql.DB, err error) {
 	return
 }
 
-func truth_or_Dares () {
+
+func TruthsAndDaresFromDB() (truthsAndDares []entities.TruthAndDare , err error) {
+	db, err := Connecttodb()
+	if err != nil {
+		log.Println("unable to connect todb")
+		return
+	}
+	query := "select * from truths_dares;"
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Println("unable to fetch truths or dares")
+		return
+	}
+
+	var t entities.TruthAndDare
+	for rows.Next(){
+		err = rows.Scan(&t.ID, &t.Challenge, &t.Type)
+		if err != nil {
+			log.Println("unable to scan from db")
+			continue
+		}
+		truthsAndDares = append(truthsAndDares, t)
+	}
+	return
+}
+
+
+/*func truth_or_Dares () {
 
 	for truths := 0; truths < 5; truths++ {
 		if !(truths >= 5) {
@@ -37,11 +65,11 @@ func truth_or_Dares () {
 		}
 	}
 	_= connectToRedis()
-}
-func connectToRedis() (conn *redis.Client) {
+}*/
+func ConnectToRedis() (conn *redis.Client) {
 	conn = redis.NewClient(
 		&redis.Options{
-			Addr:     "localhost:6379",
+			Addr:     "localhost:3306",
 			Password: "",
 			DB:       0,
 		},
@@ -50,7 +78,7 @@ func connectToRedis() (conn *redis.Client) {
 }
 
 func SaveToRedis(Key string, data interface{}, client *redis.Client) (err error) {
-	expiryTime := time.Duration(time.Minute * 2)
+	expiryTime := time.Duration(time.Minute * 30)
 
 	jsonData, _ := json.Marshal(data)
 
