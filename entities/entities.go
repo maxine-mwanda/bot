@@ -6,12 +6,12 @@ type TruthAndDare struct {
 	Type string `json:"type"`
 }
 
-//type game_session struct {
-//	game_id int `json:"game_id"`
-//	active int `json:"active"`
-//}
-//
-//type player_scores struct {
-//	user_id int `json:"user_id"`
-//	game_id int `json:"game_id"`
-//}
+type GameSession struct {
+	GameId int `json:"game_id"`
+	Active int `json:"active"`
+}
+
+type PlayerScores struct {
+	UserId int `json:"user_id"`
+	GameId int `json:"game_id"`
+}

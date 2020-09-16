@@ -1,7 +1,7 @@
 CREATE DATABASE Truth_or_dare;
 USE Truth_or_dare;
 -- modify the telegram_id field to be unique. Run this query kwa the db
-create unique index unique_telegram_id on  players (telegram_id);
+
 CREATE TABLE players
 (
     user_id     INT(10) PRIMARY KEY AUTO_INCREMENT,
@@ -47,3 +47,7 @@ VALUES
 ('Who here has the nicest butt?', 'truth'),
 ('Who is your crush?', 'truth'),
 ('Who was the last person you licked?', 'truth');
+
+
+create unique index unique_telegram_id on  players (telegram_id);
+alter table game_session add column number_of_players int default 1;

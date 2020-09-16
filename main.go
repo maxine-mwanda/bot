@@ -87,7 +87,7 @@ func listen(w http.ResponseWriter, r *http.Request) {
 func main() {
 	var port = ":3000"
 	if err := godotenv.Load(); err != nil {
-		fmt.Println("Unable to read .env file. exiting")
+		log.Println("Unable to read .env file. exiting")
 	}
 	initLogger()
 	log.Println("Running")
@@ -127,15 +127,17 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		return "Welcome to Truth or Dare game. How many players are you?", resources.PlayerCountKeyboard(gameId)
 	}
 	if strings.Contains(message, "players") {
-		// TODO: create a function that prints the game id and number of players.
 		// e.g if the message is players3-6 it prints 3 players, game 6
-		if strings.Contains(message, "players 3") {
-			resources.PlayerCountKeyboard(6)
+		message = strings.Replace(message, "players", "", 1)
+		arr := strings.Split(message, "-")
+		numberOfPlayers := arr[0]
+		gameId := arr[1]
+		if err := resources2.SetGamePlayers(gameId, numberOfPlayers); err != nil {
+			return "An error occured. Send 'start' to try again",""
 		}
-		return "Kindly tell your friends to text me 'Join 567'", ""
+		return fmt.Sprintf("Kindly tell your friends to text me 'Join %s'", gameId), ""
 	}
-	if message == "join 1" {
-		// TODO: When a player sends join 567, add the record to player_scores table
+	if strings.Contains(message, "join") {
 		userId, err := resources2.Create_player(telegramId, firstName)
 		if err != nil {
 			return "an error occured", ""
@@ -143,7 +145,18 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		gameId := strings.Replace(message, "join ", "", 1)
 		gameId = strings.Trim(gameId, " ")
 
-		// TODO : add the record to player_scores table
+		// 1. Check if game session has enough players
+		ok, err := resources2.SpaceAvailableInGameSession(gameId)
+		if err != nil {
+			return "an error occured", ""
+		}
+		if !ok {
+			return "The game already has enough players.", ""
+		}
+		err = resources2.Scores(gameId, userId)
+		if err != nil {
+			return "an error occured", ""
+		}
 		key := fmt.Sprintf("user_%d", userId)
 		truthsAndDares, err := utils.TruthsAndDaresFromDB()
 		if err != nil {
@@ -156,9 +169,9 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		}
 
 
-		return "congratulations Maxine for joining. Please choose truth or dare", resources.TruthOrDareKeyboard()
+		return "congratulations Maxine for joining. Please choose truth or dare", resources.TruthOrDareKeyboard(gameId)
 	}
-	return "Please choose truth or dare", resources.TruthOrDareKeyboard()
+	return "Please send 'start'",""
 
 }
 
@@ -229,7 +242,7 @@ func initLogger() {
 		rotatelogs.WithRotationCount(10000),
 	)
 	if err != nil {
-		fmt.Println("Failed to initialize log file ", err.Error())
+		log.Println("Failed to initialize log file ", err.Error())
 		log.SetOutput(os.Stderr)
 		return
 	}

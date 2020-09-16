@@ -5,7 +5,6 @@ import (
 	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"telegrambot/entities"
@@ -17,8 +16,8 @@ func  Connecttodb() (connection *sql.DB, err error) {
 	dburi := os.Getenv("DBURI")
 	connection, err = sql.Open("mysql", dburi)
 	if err != nil {
-		fmt.Println("unable to connect to db", err)
-		return
+		log.Println("unable to connect to db", err)
+		os.Exit(3)
 	}
 	return
 }
@@ -54,13 +53,13 @@ func TruthsAndDaresFromDB() (truthsAndDares []entities.TruthAndDare , err error)
 
 	for truths := 0; truths < 5; truths++ {
 		if !(truths >= 5) {
-			fmt.Println("answer question %d", truths)
+			log.Println("answer question %d", truths)
 			continue
 		}
 	}
 	for dares := 0; dares < 5; dares++ {
 		if !(dares >= 5) {
-			fmt.Println("answer question %d", dares)
+			log.Println("answer question %d", dares)
 			continue
 		}
 	}
@@ -69,30 +68,40 @@ func TruthsAndDaresFromDB() (truthsAndDares []entities.TruthAndDare , err error)
 func ConnectToRedis() (conn *redis.Client) {
 	conn = redis.NewClient(
 		&redis.Options{
-			Addr:     "localhost:3306",
+			Addr:     "localhost:6379",
 			Password: "",
 			DB:       0,
 		},
 	)
+
+	if err := conn.Ping().Err(); err != nil {
+		log.Println("Unable to connect to redis. Exiting...", err)
+		os.Exit(3)
+	}
 	return
 }
 
 func SaveToRedis(Key string, data interface{}, client *redis.Client) (err error) {
 	expiryTime := time.Duration(time.Minute * 30)
 
-	jsonData, _ := json.Marshal(data)
-
-	if err = client.Set(Key, jsonData, expiryTime).Err(); err != nil {
-		log.Println("Unable to save data to redis because ", err)
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Println("Unable to convert data to json because", err.Error())
 		return
 	}
+
+	if err = client.Set(Key, jsonData, expiryTime).Err(); err != nil {
+		log.Println("Unable to save data to redis because ", err.Error())
+		return
+	}
+	log.Println("Data saved to redis key ", Key)
 	return
 }
 
 func ReadFromRedis(Key string, client *redis.Client) (data string, err error) {
 	data, err = client.Get(Key).Result()
 	if err != nil {
-		fmt.Println("Unable to read ", Key, " because ", err)
+		log.Println("Unable to read ", Key, " because ", err)
 		return
 	}
 	return

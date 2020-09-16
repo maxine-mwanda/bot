@@ -2,7 +2,6 @@ package resources
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"telegrambot/resources/db/utils"
@@ -10,27 +9,27 @@ import (
 
 // TODO: When someone chooses Three, create a game session
 
-type game_session struct {
-	game_id int `json:"game_id"`
-	active int `json:"active"`
-}
+//type game_session struct {
+//	game_id int `json:"game_id"`
+//	active int `json:"active"`
+//}
 
-type player_scores struct {
-	user_id int `json:"user_id"`
-	game_id int `json:"game_id"`
-}
+//type player_scores struct {
+//	user_id int `json:"user_id"`
+//	game_id int `json:"game_id"`
+//}
 
 func CreateGameSession() (id int64, err error) {
-	query := "insert into game_session (active) values ('1')"
+	query := "insert into game_session (Active) values ('1')"
 	db, err := utils.Connecttodb()
 	if err != nil {
-		fmt.Println("unable to connect to db")
+		log.Println("unable to connect to db")
 		return
 	}
 
 	row, err := db.Exec(query)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	id, _ = row.LastInsertId()
@@ -41,28 +40,18 @@ func FetchGameId() (game_id int64, err error) {
 	query := "insert into game_session (active) values (?)"
 	db, err := utils.Connecttodb()
 	if err != nil {
-		fmt.Println("unable to connect todb")
+		log.Println("unable to connect todb")
 		return
 	}
 	row, err := db.Exec(query, 1)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	game_id, _ = row.LastInsertId()
 	return
-}
 
-	//var gs game_session
-	//for rows.Next() {
-	//	if err = rows.Scan(&gs.game_id, &gs.active, &game_session.updated_at); err != nil {
-	//		fmt.Println("Unable to scan because ", err)
-	//		continue
-	//	}
-	//	game_session = append(game_session, err)
-	//}
-	//return
-//}
+}
 
 func JsonResponse(writer http.ResponseWriter, status int, response interface{}) {
 	jsonResponse, _ := json.Marshal(response)
@@ -72,21 +61,21 @@ func JsonResponse(writer http.ResponseWriter, status int, response interface{}) 
 }
 
 
-func Scores () (user_id int64, err error){
-query := "insert into player_scores (user_id) values ('567')"
+func Scores (gameId string, userId int64) (err error){
+query := "insert into player_scores (user_id, game_id) values (?, ?)"
 	db, err := utils.Connecttodb()
 	if err != nil {
-		fmt.Println("unable to connect to db")
+		log.Println("unable to connect to db")
 		return
 	}
 
-	row, err := db.Exec(query)
+	_, err = db.Exec(query, userId, gameId)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
-	user_id, _ = row.LastInsertId()
-	return Scores()
+	log.Println("created record in player_scores")
+	return
 }
 
 
@@ -95,7 +84,7 @@ func Create_player(telegramId int, firstName string) (id int64, err error) {
 		"values (?,?)"
 	db, err := utils.Connecttodb()
 	if err != nil {
-		fmt.Println("unable to connect todb")
+		log.Println("unable to connect todb")
 		return
 	}
 	row, err := db.Exec(query, telegramId, firstName)
@@ -124,13 +113,53 @@ func PlayerScores(user_id, game_id int)  (err error){
 		"values (?,?,?)"
 	db, err := utils.Connecttodb()
 	if err != nil {
-		fmt.Println("unable to connect todb")
+		log.Println("unable to connect todb")
 		return
 	}
 	_, err = db.Exec(query, user_id, game_id, 0)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
+	return
+}
+
+func SetGamePlayers(gameId, numberOfPlayers string) (err error) {
+	query := "update game_session set number_of_players=? where game_id=?"
+	db, err := utils.Connecttodb()
+	if err != nil {
+		log.Println("unable to connect todb")
+		return
+	}
+	if _, err = db.Exec(query, numberOfPlayers, gameId); err != nil {
+		log.Println("Unable to update the game session because ", err)
+		return
+	}
+	log.Println("Game session updated successfully")
+	return
+}
+
+func SpaceAvailableInGameSession(gameId string) (ok bool, err error) {
+	db, err := utils.Connecttodb()
+	if err != nil {
+		log.Println("unable to connect todb")
+		return
+	}
+
+	queryMaxPlayers := "select number_of_players from game_session where game_id=? and active=1"
+	var maxNumberOfPlayers int
+	if err = db.QueryRow(queryMaxPlayers, gameId).Scan(&maxNumberOfPlayers); err != nil {
+		log.Println("Unable to read maximum players because ", err)
+		return
+	}
+
+	var joinedNumberOfPlayers int
+	queryNoJoinedPlayers := "select count(*) from player_scores where game_id=?"
+	if err = db.QueryRow(queryNoJoinedPlayers, gameId).Scan(&joinedNumberOfPlayers); err != nil {
+		log.Println("Unable to count joined players because ", err)
+		return
+	}
+	ok = joinedNumberOfPlayers < maxNumberOfPlayers
+	log.Println("Max : ", maxNumberOfPlayers, " Joined : ", joinedNumberOfPlayers)
 	return
 }

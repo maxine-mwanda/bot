@@ -30,20 +30,20 @@ func AcceptDeclineKeyboard() string {
 }
 
 
-func TruthOrDareKeyboard() string {
+func TruthOrDareKeyboard(gameId string) string {
 	keyboard := map[string]interface{}{
 		"inline_keyboard": [][]map[string]string{
 			{
 				{
 					"text":          "Truth",
-					"callback_data": "truth",
+					"callback_data": "truth-" + gameId,
 				},
 			},
 
 			{
 				{
 					"text":          "Dare",
-					"callback_data": "dare",
+					"callback_data": "dare-" + gameId,
 				},
 			},
 		},
