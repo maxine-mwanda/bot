@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"telegrambot/entities"
 	"telegrambot/resources"
 	resources2 "telegrambot/resources/db"
 	"telegrambot/resources/db/utils"
@@ -22,6 +23,10 @@ import (
 
 type Message struct {
 	CallbackQuery struct {
+		From struct {
+			ID        int    `json:"id"`
+			FirstName string `json:"first_name"`
+		} `json:"from"`
 		Data    string `json:"data"`
 		Message struct {
 			Chat struct {
@@ -57,7 +62,6 @@ func listen(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Received payload")
 
-
 	if data.CallbackQuery.Data == "" {
 		// its a message
 		chatId = data.Message.Chat.Id
@@ -68,8 +72,8 @@ func listen(w http.ResponseWriter, r *http.Request) {
 		// its a callback (button, keyboard)
 		chatId = data.CallbackQuery.Message.Chat.Id
 		msg = data.CallbackQuery.Data
-		//telegramId = data.Message.From.ID
-		//firstName = data.Message.From.FirstName
+		telegramId = data.CallbackQuery.From.ID
+		firstName = data.CallbackQuery.From.FirstName
 	}
 
 	log.Println("message", msg, "chat Id ", chatId)
@@ -112,11 +116,27 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 	message = strings.ToLower(message)
 	log.Println("The Message == ", message)
 
-	if message == "truth" {
-		return getTruth(), resources.AcceptDeclineKeyboard()
+	if strings.Contains(message, "truth") {
+		gameId := strings.Replace(message, "truth-", "", 1)
+		challenge := gettruthordare("truth", telegramId)
+		if challenge == "" {
+			return "An error occured, try again", resources.TruthOrDareKeyboard(gameId)
+		}
+		if challenge == "Game over" {
+			return "Game Over.", ""
+		}
+		return challenge, resources.AcceptDeclineKeyboard(gameId)
 	}
-	if message == "dare" {
-		return getDare(), resources.AcceptDeclineKeyboard()
+	if strings.Contains(message, "dare") {
+		gameId := strings.Replace(message, "dare-", "", 1)
+		challenge := gettruthordare("dare", telegramId)
+		if challenge == "" {
+			return "An error occured, try again", resources.TruthOrDareKeyboard(gameId)
+		}
+		if challenge == "Game over" {
+			return "Game Over.", ""
+		}
+		return challenge, resources.AcceptDeclineKeyboard(gameId)
 	}
 	if message == "start" || message == "/start" {
 		// TODO: When someone chooses Three, create a game session
@@ -133,7 +153,7 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		numberOfPlayers := arr[0]
 		gameId := arr[1]
 		if err := resources2.SetGamePlayers(gameId, numberOfPlayers); err != nil {
-			return "An error occured. Send 'start' to try again",""
+			return "An error occured. Send 'start' to try again", ""
 		}
 		return fmt.Sprintf("Kindly tell your friends to text me 'Join %s'", gameId), ""
 	}
@@ -157,7 +177,7 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		if err != nil {
 			return "an error occured", ""
 		}
-		key := fmt.Sprintf("user_%d", userId)
+		key := fmt.Sprintf("user_%d", telegramId)
 		truthsAndDares, err := utils.TruthsAndDaresFromDB()
 		if err != nil {
 			return "an error occured", ""
@@ -168,45 +188,10 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 			return "an error occured", ""
 		}
 
-
 		return "congratulations Maxine for joining. Please choose truth or dare", resources.TruthOrDareKeyboard(gameId)
 	}
-	return "Please send 'start'",""
+	return "Please send 'start'", ""
 
-}
-
-func getTruth() string {
-
-	currentTimeNanoSeconds := time.Now().UnixNano()
-	rand.Seed(currentTimeNanoSeconds)
-
-	var truths = [5]string{
-		"When was the last time you lied?",
-		"When was the last time you cried?",
-		"What's your biggest fear?",
-		"What's your biggest fantasy?",
-		"Do you have any fetishes?",
-	}
-	position := rand.Intn(5)
-
-	return truths[position]
-
-	}
-
-func getDare() string {
-
-	currentTimeNanoSeconds := time.Now().UnixNano()
-	rand.Seed(currentTimeNanoSeconds)
-
-	var dares = [5]string{
-		"Kiss the person to your left",
-		"Attempt to do a magic trick",
-		"Do four cartwheels in row",
-		"Let someone shave part of your body",
-		"Eat five tablespoons of a condiment",
-	}
-	position := rand.Intn(5)
-	return dares[position]
 }
 
 func sendmessage(chatid int, message, keyboard string) (err error) {
@@ -252,4 +237,55 @@ func initLogger() {
 	}
 	log.SetOutput(writer)
 	return
+}
+
+func gettruthordare(truth_or_dare string, telegramId int) string {
+	log.Println("telegramID: ", telegramId, "choice: ", truth_or_dare)
+	key := fmt.Sprintf("user_%d", telegramId)
+	redisClient := utils.ConnectToRedis()
+	data, err := utils.ReadFromRedis(key, redisClient)
+	if err != nil {
+		log.Println("An error occured. Please try again.", err)
+		return ""
+	}
+	var challenges []entities.TruthAndDare
+	if err := json.Unmarshal([]byte(data), &challenges); err != nil {
+		log.Println("An error occured. Please try again.", err)
+		return ""
+	}
+
+	length := len(challenges)
+
+	if length< 1 {
+		return "Game over"
+	}
+
+	currentTimeNanoSeconds := time.Now().UnixNano()
+
+	rand.Seed(currentTimeNanoSeconds)
+	position := rand.Intn(length)
+	challenge := challenges[position]
+
+	//tries := 0
+	//for challenge.Type != truth_or_dare && tries < 200  {
+	//	position := rand.Intn(length)
+	//	challenge = challenges[position]
+	//	log.Println("== trial : ", tries," position: ", position, " type: ", challenge.Type, "choice: ", truth_or_dare)
+	//	tries ++
+	//}
+
+	log.Println("The chosen challenge :: position ", position, "challenge: ", challenge.Challenge)
+	// reference : https://yourbasic.org/golang/delete-element-slice/
+	log.Println("The original array length is ", len(challenges))
+	challenges[position] = challenges[length-1]
+	challenges[length-1] = entities.TruthAndDare{}
+	challenges = challenges[:length-1]
+	log.Println("The new array length is ", len(challenges))
+
+	_ = utils.SaveToRedis(key, nil, redisClient)
+	if err := utils.SaveToRedis(key, challenges, redisClient); err != nil {
+		log.Println("Unable to update redis because ", err)
+	}
+
+	return challenge.Challenge
 }

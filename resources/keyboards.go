@@ -3,23 +3,22 @@ package resources
 import (
 	"encoding/json"
 	"fmt"
-	resources "telegrambot/resources/db"
 )
 
-func AcceptDeclineKeyboard() string {
+func AcceptDeclineKeyboard(gameId string) string {
 	keyboard_first := map[string]interface{}{
 		"inline_keyboard": [][]map[string]string{
 			{
 				{
 					"text":          "Accept",
-					"callback_data": "accept_g567_q1",
+					"callback_data": "accept-"+gameId,
 				},
 			},
 
 			{
 				{
 					"text":          "Decline",
-					"callback_data": fmt.Sprintf("You have lost %d points", resources.PlayerScores),
+					"callback_data": "decline-"+gameId,
 				},
 			},
 		},
@@ -35,17 +34,17 @@ func TruthOrDareKeyboard(gameId string) string {
 		"inline_keyboard": [][]map[string]string{
 			{
 				{
-					"text":          "Truth",
+					"text":          "Truth or Dare",
 					"callback_data": "truth-" + gameId,
 				},
 			},
 
-			{
-				{
-					"text":          "Dare",
-					"callback_data": "dare-" + gameId,
-				},
-			},
+			//{
+			//	{
+			//		"text":          "Dare",
+			//		"callback_data": "dare-" + gameId,
+			//	},
+			//},
 		},
 	}
 

@@ -48,6 +48,16 @@ VALUES
 ('Who is your crush?', 'truth'),
 ('Who was the last person you licked?', 'truth');
 
+INSERT INTO truths_dares (challenge, type)
+VALUES
+('Kiss the person to your left', 'dare'),
+('Attempt to do a magic trick', 'dare'),
+('Do four cartwheels in row', 'dare'),
+('Let someone shave part of your body', 'dare'),
+('Eat five tablespoons of a condiment', 'dare');
+
+
+
 
 create unique index unique_telegram_id on  players (telegram_id);
 alter table game_session add column number_of_players int default 1;

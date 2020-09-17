@@ -106,3 +106,4 @@ func ReadFromRedis(Key string, client *redis.Client) (data string, err error) {
 	}
 	return
 }
+
