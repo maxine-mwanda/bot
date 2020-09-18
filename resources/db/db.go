@@ -7,17 +7,6 @@ import (
 	"telegrambot/resources/db/utils"
 )
 
-// TODO: When someone chooses Three, create a game session
-
-//type game_session struct {
-//	game_id int `json:"game_id"`
-//	active int `json:"active"`
-//}
-
-//type player_scores struct {
-//	user_id int `json:"user_id"`
-//	game_id int `json:"game_id"`
-//}
 
 func CreateGameSession() (id int64, err error) {
 	query := "insert into game_session (Active) values ('1')"
@@ -108,19 +97,35 @@ func Create_player(telegramId int, firstName string) (id int64, err error) {
 	return
 }
 
-func PlayerScores(user_id, game_id int)  (err error){
-	query := "insert into player_scores (user_id, game_id, scores)" +
-		"values (?,?,?)"
+func PlayerScores(telegramId int, gameId string) (err error) {
+	query := "update player_scores set scores = scores + 10 where game_id=? " +
+		"and user_id=(select user_id from players where telegram_id=?);"
 	db, err := utils.Connecttodb()
 	if err != nil {
-		log.Println("unable to connect todb")
+		log.Println("unable to connect to db")
 		return
 	}
-	_, err = db.Exec(query, user_id, game_id, 0)
+	_, err = db.Exec(query, gameId, telegramId)
 	if err != nil {
 		log.Println(err)
 		return
 	}
+	return
+}
+
+func GetFinalScore(gameId string, telegramId int) (score int64, err error){
+	query := "select scores from player_scores where game_id=? and user_id=(select user_id from players where telegram_id=?)"
+	db, err := utils.Connecttodb()
+	if err != nil {
+		log.Println("unable to connect to db")
+		return
+	}
+
+	if err = db.QueryRow(query, gameId, telegramId).Scan(&score); err != nil {
+		log.Println("Unable to fetch score because ", err)
+		return
+	}
+	log.Println("Found score as ", score)
 	return
 }
 

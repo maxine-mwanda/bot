@@ -49,22 +49,6 @@ func TruthsAndDaresFromDB() (truthsAndDares []entities.TruthAndDare , err error)
 }
 
 
-/*func truth_or_Dares () {
-
-	for truths := 0; truths < 5; truths++ {
-		if !(truths >= 5) {
-			log.Println("answer question %d", truths)
-			continue
-		}
-	}
-	for dares := 0; dares < 5; dares++ {
-		if !(dares >= 5) {
-			log.Println("answer question %d", dares)
-			continue
-		}
-	}
-	_= connectToRedis()
-}*/
 func ConnectToRedis() (conn *redis.Client) {
 	conn = redis.NewClient(
 		&redis.Options{

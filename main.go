@@ -123,7 +123,11 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 			return "An error occured, try again", resources.TruthOrDareKeyboard(gameId)
 		}
 		if challenge == "Game over" {
-			return "Game Over.", ""
+			score, err := resources2.GetFinalScore(gameId, telegramId)
+			if err != nil {
+				return "Game Over.", ""
+			}
+			return fmt.Sprintf("You have %d points.\nGame Over", score), ""
 		}
 		return challenge, resources.AcceptDeclineKeyboard(gameId)
 	}
@@ -134,20 +138,51 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 			return "An error occured, try again", resources.TruthOrDareKeyboard(gameId)
 		}
 		if challenge == "Game over" {
-			return "Game Over.", ""
+			score, err := resources2.GetFinalScore(gameId, telegramId)
+			if err != nil {
+				return "Game Over.", ""
+			}
+			return fmt.Sprintf("You have %d points.\nGame Over", score), ""
 		}
 		return challenge, resources.AcceptDeclineKeyboard(gameId)
 	}
-	if message == "start" || message == "/start" {
-		// TODO: When someone chooses Three, create a game session
+	if message == "start" {
 		gameId, err := resources2.CreateGameSession()
 		if err != nil {
 			return "An error occured. Please try again later.", ""
 		}
-		return "Welcome to Truth or Dare game. How many players are you?", resources.PlayerCountKeyboard(gameId)
+
+		return "How many players are you?", resources.PlayerCountKeyboard(gameId)
+	}
+	if message == "/start" {
+		return "Welcome to truth or dare. \n1. Start the game by typing 'start'. \n2. Select the number of players. \n3. Join the game by sending the game session number. \n4. You have the option of accepting or declining a challenge. If you accept you earn ten points, if you decline you get 0.", ""
+	}
+	if strings.Contains(message, "accept") {
+		gameId := strings.Replace(message, "accept-", "", 1)
+		err := resources2.PlayerScores(telegramId, gameId)
+		if err != nil {
+			return "An error occured, please try again", resources.TruthOrDareKeyboard(gameId)
+		}
+		return "You have been awarded 10 points.", resources.TruthOrDareKeyboard(gameId)
+	}
+		if strings.Contains(message, "decline") {
+			gameId := strings.Replace(message, "decline-", "", 1)
+			return "You have not been awarded any points.", resources.TruthOrDareKeyboard(gameId)
+}
+
+	if strings.Contains(message, "stop") {
+		gameId := strings.Replace(message, "stop", "", 1)
+		challenge := gettruthordare("stop", telegramId)
+		if challenge == "" {
+			return "Game over", ""
+		}
+		if challenge == "Game over" {
+			// function to get score
+			return "Game Over.", ""
+		}
+		return challenge, resources.AcceptDeclineKeyboard(gameId)
 	}
 	if strings.Contains(message, "players") {
-		// e.g if the message is players3-6 it prints 3 players, game 6
 		message = strings.Replace(message, "players", "", 1)
 		arr := strings.Split(message, "-")
 		numberOfPlayers := arr[0]
@@ -155,7 +190,7 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		if err := resources2.SetGamePlayers(gameId, numberOfPlayers); err != nil {
 			return "An error occured. Send 'start' to try again", ""
 		}
-		return fmt.Sprintf("Kindly tell your friends to text me 'Join %s'", gameId), ""
+		return fmt.Sprintf("Please reply with 'Join %s'. Also, kindly tell your friends to text me 'Join %s'", gameId, gameId), ""
 	}
 	if strings.Contains(message, "join") {
 		userId, err := resources2.Create_player(telegramId, firstName)
@@ -188,7 +223,7 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 			return "an error occured", ""
 		}
 
-		return "congratulations Maxine for joining. Please choose truth or dare", resources.TruthOrDareKeyboard(gameId)
+		return fmt.Sprintf("Congratulations %s for joining. Please choose truth or dare", firstName), resources.TruthOrDareKeyboard(gameId)
 	}
 	return "Please send 'start'", ""
 
