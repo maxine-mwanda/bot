@@ -1,54 +1,27 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"log"
-	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"telegrambot/entities"
-	"telegrambot/resources"
-	resources2 "telegrambot/resources/db"
-	"telegrambot/resources/db/utils"
-	"time"
+	"telegrambot/models"
+	"telegrambot/utilities"
 )
 
-type Message struct {
-	CallbackQuery struct {
-		From struct {
-			ID        int    `json:"id"`
-			FirstName string `json:"first_name"`
-		} `json:"from"`
-		Data    string `json:"data"`
-		Message struct {
-			Chat struct {
-				Id int `json:"id"`
-			} `json:"chat"`
-		} `json:"message"`
-	} `json:"callback_query"`
-
-	Message struct {
-		Text string `json:"text"`
-		From struct {
-			ID        int    `json:"id"`
-			FirstName string `json:"first_name"`
-		} `json:"from"`
-		Chat struct {
-			Id int `json:"id"`
-		} `json:"chat"`
-	} `json:"message"`
-}
+var dbConn *sql.DB
+var redisClient *redis.Client
 
 func listen(w http.ResponseWriter, r *http.Request) {
-	var data Message
+	var data entities.Message
 	var chatId int
 	var msg string
 	var firstName string
@@ -80,7 +53,7 @@ func listen(w http.ResponseWriter, r *http.Request) {
 	response, keyboard := getresponse(msg, firstName, telegramId)
 	log.Println("response", response)
 	log.Println("keyboard", keyboard)
-	err = sendmessage(chatId, response, keyboard)
+	err = utilities.Sendmessage(chatId, response, keyboard)
 	if err != nil {
 		log.Println("error", err)
 	}
@@ -93,8 +66,12 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Unable to read .env file. exiting")
 	}
-	initLogger()
+	utilities.InitLogger()
 	log.Println("Running")
+
+	redisClient = utilities.ConnectToRedis()
+	dbConn = utilities.Connecttodb()
+
 
 	headers := handlers.AllowedHeaders([]string{"X-Requested-With", "content-type", "content-length", "accept-encoding", "Authorization"})
 	origins := handlers.AllowedOrigins([]string{"*"})
@@ -118,82 +95,71 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 
 	if strings.Contains(message, "truth") {
 		gameId := strings.Replace(message, "truth-", "", 1)
-		challenge := gettruthordare("truth", telegramId)
+		challenge := models.GetTruthOrDareFromRedis("truth", telegramId, redisClient)
 		if challenge == "" {
-			return "An error occured, try again", resources.TruthOrDareKeyboard(gameId)
+			return "An error occured, try again", utilities.TruthOrDareKeyboard(gameId)
 		}
 		if challenge == "Game over" {
-			score, err := resources2.GetFinalScore(gameId, telegramId)
+			score, err := models.GetFinalScore(gameId, telegramId, dbConn)
 			if err != nil {
 				return "Game Over.", ""
 			}
 			return fmt.Sprintf("You have %d points.\nGame Over", score), ""
 		}
-		return challenge, resources.AcceptDeclineKeyboard(gameId)
+		return challenge, utilities.AcceptDeclineKeyboard(gameId)
 	}
 	if strings.Contains(message, "dare") {
 		gameId := strings.Replace(message, "dare-", "", 1)
-		challenge := gettruthordare("dare", telegramId)
+		challenge := models.GetTruthOrDareFromRedis("dare", telegramId, redisClient)
 		if challenge == "" {
-			return "An error occured, try again", resources.TruthOrDareKeyboard(gameId)
+			return "An error occured, try again", utilities.TruthOrDareKeyboard(gameId)
 		}
 		if challenge == "Game over" {
-			score, err := resources2.GetFinalScore(gameId, telegramId)
+			score, err := models.GetFinalScore(gameId, telegramId, dbConn)
 			if err != nil {
 				return "Game Over.", ""
 			}
 			return fmt.Sprintf("You have %d points.\nGame Over", score), ""
 		}
-		return challenge, resources.AcceptDeclineKeyboard(gameId)
+		return challenge, utilities.AcceptDeclineKeyboard(gameId)
 	}
 	if message == "start" {
-		gameId, err := resources2.CreateGameSession()
+		gameId, err := models.CreateGameSession(dbConn)
 		if err != nil {
 			return "An error occured. Please try again later.", ""
 		}
 
-		return "How many players are you?", resources.PlayerCountKeyboard(gameId)
+		return "How many players are you?", utilities.PlayerCountKeyboard(gameId)
 	}
 	if message == "/start" {
 		return "Welcome to truth or dare. \n1. Start the game by typing 'start'. \n2. Select the number of players. \n3. Join the game by sending the game session number. \n4. You have the option of accepting or declining a challenge. If you accept you earn ten points, if you decline you get 0.", ""
 	}
 	if strings.Contains(message, "accept") {
 		gameId := strings.Replace(message, "accept-", "", 1)
-		err := resources2.PlayerScores(telegramId, gameId)
+		err := models.UpdatePlayerScore(telegramId, gameId, dbConn)
 		if err != nil {
-			return "An error occured, please try again", resources.TruthOrDareKeyboard(gameId)
+			return "An error occured, please try again", utilities.TruthOrDareKeyboard(gameId)
 		}
-		return "You have been awarded 10 points.", resources.TruthOrDareKeyboard(gameId)
+		return "You have been awarded 10 points.", utilities.TruthOrDareKeyboard(gameId)
 	}
-		if strings.Contains(message, "decline") {
-			gameId := strings.Replace(message, "decline-", "", 1)
-			return "You have not been awarded any points.", resources.TruthOrDareKeyboard(gameId)
-}
+	if strings.Contains(message, "decline") {
+		gameId := strings.Replace(message, "decline-", "", 1)
+		return "You have not been awarded any points.", utilities.TruthOrDareKeyboard(gameId)
+	}
 
-	if strings.Contains(message, "stop") {
-		gameId := strings.Replace(message, "stop", "", 1)
-		challenge := gettruthordare("stop", telegramId)
-		if challenge == "" {
-			return "Game over", ""
-		}
-		if challenge == "Game over" {
-			// function to get score
-			return "Game Over.", ""
-		}
-		return challenge, resources.AcceptDeclineKeyboard(gameId)
-	}
+
 	if strings.Contains(message, "players") {
 		message = strings.Replace(message, "players", "", 1)
 		arr := strings.Split(message, "-")
 		numberOfPlayers := arr[0]
 		gameId := arr[1]
-		if err := resources2.SetGamePlayers(gameId, numberOfPlayers); err != nil {
+		if err := models.SetNumberOfGamePlayers(gameId, numberOfPlayers, dbConn); err != nil {
 			return "An error occured. Send 'start' to try again", ""
 		}
 		return fmt.Sprintf("Please reply with 'Join %s'. Also, kindly tell your friends to text me 'Join %s'", gameId, gameId), ""
 	}
 	if strings.Contains(message, "join") {
-		userId, err := resources2.Create_player(telegramId, firstName)
+		userId, err := models.CreatePlayer(telegramId, firstName, dbConn)
 		if err != nil {
 			return "an error occured", ""
 		}
@@ -201,126 +167,29 @@ func getresponse(message, firstName string, telegramId int) (string, string) {
 		gameId = strings.Trim(gameId, " ")
 
 		// 1. Check if game session has enough players
-		ok, err := resources2.SpaceAvailableInGameSession(gameId)
+		ok, err := models.SpaceAvailableInGameSession(gameId, dbConn)
 		if err != nil {
 			return "an error occured", ""
 		}
 		if !ok {
 			return "The game already has enough players.", ""
 		}
-		err = resources2.Scores(gameId, userId)
+		err = models.Scores(gameId, userId, dbConn)
 		if err != nil {
 			return "an error occured", ""
 		}
 		key := fmt.Sprintf("user_%d", telegramId)
-		truthsAndDares, err := utils.TruthsAndDaresFromDB()
+		truthsAndDares, err := models.TruthsAndDaresFromDB(dbConn)
 		if err != nil {
 			return "an error occured", ""
 		}
-		redisClient := utils.ConnectToRedis()
-		err = utils.SaveToRedis(key, truthsAndDares, redisClient)
+		err = utilities.SaveToRedis(key, truthsAndDares, redisClient)
 		if err != nil {
 			return "an error occured", ""
 		}
 
-		return fmt.Sprintf("Congratulations %s for joining. Please choose truth or dare", firstName), resources.TruthOrDareKeyboard(gameId)
+		return fmt.Sprintf("Congratulations %s for joining. Please choose truth or dare", firstName), utilities.TruthOrDareKeyboard(gameId)
 	}
 	return "Please send 'start'", ""
 
-}
-
-func sendmessage(chatid int, message, keyboard string) (err error) {
-	token := os.Getenv("TOKEN")
-	msg := url.QueryEscape(message)
-	link := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s&reply_markup=%s", token, chatid, msg, keyboard)
-	log.Println("Sending message :: ", link)
-	client := &http.Client{}
-
-	req, err := http.NewRequest("GET", link, nil)
-	if err != nil {
-		return err
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	if res.StatusCode != 200 {
-		return errors.New(res.Status)
-	}
-	log.Println("Message sent back to telegram")
-	return nil
-}
-
-func initLogger() {
-	logFolder := os.Getenv("LOG_FOLDER")
-	writer, err := rotatelogs.New(
-		fmt.Sprintf("%s%s.log", logFolder+"app-", "%Y-%m-%d.%H%M"),
-		rotatelogs.WithLinkName(logFolder+"link.log"),
-		rotatelogs.WithRotationTime(time.Hour*24),
-		rotatelogs.WithMaxAge(-1),
-		rotatelogs.WithRotationCount(10000),
-	)
-	if err != nil {
-		log.Println("Failed to initialize log file ", err.Error())
-		log.SetOutput(os.Stderr)
-		return
-	}
-	if os.Getenv("ENV") == "dev" {
-		log.SetOutput(os.Stderr)
-		return
-	}
-	log.SetOutput(writer)
-	return
-}
-
-func gettruthordare(truth_or_dare string, telegramId int) string {
-	log.Println("telegramID: ", telegramId, "choice: ", truth_or_dare)
-	key := fmt.Sprintf("user_%d", telegramId)
-	redisClient := utils.ConnectToRedis()
-	data, err := utils.ReadFromRedis(key, redisClient)
-	if err != nil {
-		log.Println("An error occured. Please try again.", err)
-		return ""
-	}
-	var challenges []entities.TruthAndDare
-	if err := json.Unmarshal([]byte(data), &challenges); err != nil {
-		log.Println("An error occured. Please try again.", err)
-		return ""
-	}
-
-	length := len(challenges)
-
-	if length< 1 {
-		return "Game over"
-	}
-
-	currentTimeNanoSeconds := time.Now().UnixNano()
-
-	rand.Seed(currentTimeNanoSeconds)
-	position := rand.Intn(length)
-	challenge := challenges[position]
-
-	//tries := 0
-	//for challenge.Type != truth_or_dare && tries < 200  {
-	//	position := rand.Intn(length)
-	//	challenge = challenges[position]
-	//	log.Println("== trial : ", tries," position: ", position, " type: ", challenge.Type, "choice: ", truth_or_dare)
-	//	tries ++
-	//}
-
-	log.Println("The chosen challenge :: position ", position, "challenge: ", challenge.Challenge)
-	// reference : https://yourbasic.org/golang/delete-element-slice/
-	log.Println("The original array length is ", len(challenges))
-	challenges[position] = challenges[length-1]
-	challenges[length-1] = entities.TruthAndDare{}
-	challenges = challenges[:length-1]
-	log.Println("The new array length is ", len(challenges))
-
-	_ = utils.SaveToRedis(key, nil, redisClient)
-	if err := utils.SaveToRedis(key, challenges, redisClient); err != nil {
-		log.Println("Unable to update redis because ", err)
-	}
-
-	return challenge.Challenge
 }
